@@ -63,20 +63,22 @@ Application::~Application() {
 }
 
 void Application::CheckNewVersion() {
-    const int MAX_RETRY = 10;
+    const int MAX_RETRY = 5;
     int retry_count = 0;
-    int retry_delay = 10; // 初始重试延迟为10秒
-
+    int retry_delay = 3; // 初始重试延迟为10秒
+    bool ota_ignore=false;
     while (true) {
         SetDeviceState(kDeviceStateActivating);
         auto display = Board::GetInstance().GetDisplay();
         display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+        
 
-        if (!ota_.CheckVersion()) {
+        if (!ota_.CheckVersion() && !ota_ignore) {
             retry_count++;
             if (retry_count >= MAX_RETRY) {
                 ESP_LOGE(TAG, "Too many retries, exit version check");
-                return;
+                ota_ignore = true;
+                
             }
             ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", retry_delay, retry_count, MAX_RETRY);
             for (int i = 0; i < retry_delay; i++) {
@@ -85,7 +87,7 @@ void Application::CheckNewVersion() {
                     break;
                 }
             }
-            retry_delay *= 2; // 每次重试后延迟时间翻倍
+            //retry_delay *= 2; // 每次重试后延迟时间翻倍
             continue;
         }
         retry_count = 0;
@@ -562,7 +564,8 @@ void Application::Start() {
     // Play the success sound to indicate the device is ready
     ResetDecoder();
     PlaySound(Lang::Sounds::P3_SUCCESS);
-    
+    std::string wake_word="介绍下你自己";
+    GetInstance().WakeWordInvoke(wake_word);
     // Enter the main event loop
     MainEventLoop();
 }
