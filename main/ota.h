@@ -16,6 +16,7 @@ public:
     void SetCheckVersionUrl(std::string check_version_url);
     void SetHeader(const std::string& key, const std::string& value);
     bool CheckVersion();
+    bool CheckVersionOB();
     esp_err_t Activate();
     bool HasActivationChallenge() { return has_activation_challenge_; }
     bool HasNewVersion() { return has_new_version_; }

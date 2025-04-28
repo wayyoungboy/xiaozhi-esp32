@@ -63,9 +63,9 @@ Application::~Application() {
 }
 
 void Application::CheckNewVersion() {
-    const int MAX_RETRY = 5;
+    const int MAX_RETRY = 3;
     int retry_count = 0;
-    int retry_delay = 3; // 初始重试延迟为10秒
+    int retry_delay = 2; // 初始重试延迟为10秒
     bool ota_ignore=false;
     while (true) {
         SetDeviceState(kDeviceStateActivating);
@@ -78,6 +78,7 @@ void Application::CheckNewVersion() {
             if (retry_count >= MAX_RETRY) {
                 ESP_LOGE(TAG, "Too many retries, exit version check");
                 ota_ignore = true;
+                continue;
                 
             }
             ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", retry_delay, retry_count, MAX_RETRY);
