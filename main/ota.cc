@@ -215,9 +215,7 @@ bool Ota::CheckVersion() {
         ESP_LOGE(TAG, "Check version URL is not properly set");
         return false;
     }
-    if (CheckVersionOB()) {
-        return true;
-    }
+
 
     ESP_LOGI(TAG, "check_version_url_: %s",check_version_url_.c_str());
 

@@ -1,5 +1,15 @@
+ 
 #include "wifi_board.h"
-#include "audio_codecs/es8311_audio_codec.h"
+#include "display/lcd_display.h"
+#include "application.h"
+#include "button.h"
+#include "config.h"
+#include "iot/thing_manager.h"
+
+#include <esp_log.h>
+#include <driver/i2c_master.h>
+#include <driver/spi_common.h>
+#include "wifi_board.h"
 #include "display/oled_display.h"
 #include "application.h"
 #include "button.h"
@@ -9,7 +19,7 @@
 #include "config.h"
 #include "power_save_timer.h"
 #include "font_awesome_symbols.h"
-
+#include "audio_codecs/no_audio_codec.h"
 #include <wifi_station.h>
 #include <esp_log.h>
 #include <esp_efuse_table.h>
@@ -19,6 +29,7 @@
 
 #define TAG "WayoungC3Board"
 
+// 声明字体
 LV_FONT_DECLARE(font_puhui_14_1);
 LV_FONT_DECLARE(font_awesome_14_1);
 
@@ -31,6 +42,7 @@ private:
     Button boot_button_;
     bool press_to_talk_enabled_ = false;
     PowerSaveTimer* power_save_timer_;
+    Button asr_button_;
 
     void InitializePowerSaveTimer() {
         power_save_timer_ = new PowerSaveTimer(160, 60);
@@ -58,8 +70,8 @@ private:
         // Initialize I2C peripheral
         i2c_master_bus_config_t i2c_bus_cfg = {
             .i2c_port = I2C_NUM_0,
-            .sda_io_num = AUDIO_CODEC_I2C_SDA_PIN,
-            .scl_io_num = AUDIO_CODEC_I2C_SCL_PIN,
+            .sda_io_num = I2C_SDA_PIN,
+            .scl_io_num = I2C_SCL_PIN,
             .clk_source = I2C_CLK_SRC_DEFAULT,
             .glitch_ignore_cnt = 7,
             .intr_priority = 0,
@@ -70,7 +82,6 @@ private:
         };
         ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_cfg, &codec_i2c_bus_));
     }
-
     void InitializeSsd1306Display() {
         // SSD1306 config
         esp_lcd_panel_io_i2c_config_t io_config = {
@@ -119,6 +130,7 @@ private:
             {&font_puhui_14_1, &font_awesome_14_1});
     }
 
+
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
@@ -140,21 +152,35 @@ private:
                 Application::GetInstance().StopListening();
             }
         });
-    }
+        //todo : 外部模块按键
+        asr_button_.OnClick([this]() {
+            auto& app = Application::GetInstance();
+            DeviceState current_state = app.GetInstance().GetDeviceState();
+            ESP_LOGI(TAG, "Current device state: %d", current_state);
+            if (current_state == kDeviceStateIdle) {
+                if (!press_to_talk_enabled_) {
+                    app.ToggleChatState();
+                }
+            }
 
+        });
+    }
     // 物联网初始化，添加对 AI 可见设备
     void InitializeIot() {
-        Settings settings("vendor");
-        press_to_talk_enabled_ = settings.GetInt("press_to_talk", 0) != 0;
+        // Settings settings("vendor");
+        // press_to_talk_enabled_ = settings.GetInt("press_to_talk", 0) != 0;
 
+        // auto& thing_manager = iot::ThingManager::GetInstance();
+        // thing_manager.AddThing(iot::CreateThing("Speaker"));
+        // thing_manager.AddThing(iot::CreateThing("PressToTalk"));
         auto& thing_manager = iot::ThingManager::GetInstance();
         thing_manager.AddThing(iot::CreateThing("Speaker"));
-        thing_manager.AddThing(iot::CreateThing("PressToTalk"));
+        thing_manager.AddThing(iot::CreateThing("Lamp"));
     }
 
 public:
-    WayoungC3Board() : boot_button_(BOOT_BUTTON_GPIO) {  
-        // 把 ESP32C3 的 VDD SPI 引脚作为普通 GPIO 口使用
+    // 构造函数
+    WayoungC3Board() : boot_button_(BOOT_BUTTON_GPIO) , asr_button_(ASR_BUTTON_GPIO){
         esp_efuse_write_field_bit(ESP_EFUSE_VDD_SPI_AS_GPIO);
 
         InitializeCodecI2c();
@@ -163,23 +189,30 @@ public:
         InitializePowerSaveTimer();
         InitializeIot();
     }
+    // virtual Led* GetLed() override {
+    //     static SingleLed led(BUILTIN_LED_GPIO);
+    //     return &led;
+    // }
 
-    virtual Led* GetLed() override {
-        static SingleLed led(BUILTIN_LED_GPIO);
-        return &led;
-    }
+    // 获取音频编解码器
+    virtual AudioCodec* GetAudioCodec() override 
+    {
 
-    virtual Display* GetDisplay() override {
-        return display_;
-    }
-
-    virtual AudioCodec* GetAudioCodec() override {
-        static Es8311AudioCodec audio_codec(codec_i2c_bus_, I2C_NUM_0, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
-            AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN,
-            AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR);
+#ifdef AUDIO_I2S_METHOD_SIMPLEX
+        static NoAudioCodecSimplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+            AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN);
+#else
+        static NoAudioCodecDuplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+            AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN);
+#endif
         return &audio_codec;
     }
 
+    // 获取显示屏
+    virtual Display* GetDisplay() override {
+        return display_;
+    }
+    
     void SetPressToTalkEnabled(bool enabled) {
         press_to_talk_enabled_ = enabled;
 
@@ -193,31 +226,5 @@ public:
     }
 };
 
+// 注册开发板
 DECLARE_BOARD(WayoungC3Board);
-
-
-namespace iot {
-
-class PressToTalk : public Thing {
-public:
-    PressToTalk() : Thing("PressToTalk", "控制对话模式，一种是长按对话，一种是单击后连续对话。") {
-        // 定义设备的属性
-        properties_.AddBooleanProperty("enabled", "true 表示长按说话模式，false 表示单击说话模式", []() -> bool {
-            auto board = static_cast<WayoungC3Board*>(&Board::GetInstance());
-            return board->IsPressToTalkEnabled();
-        });
-
-        // 定义设备可以被远程执行的指令
-        methods_.AddMethod("SetEnabled", "启用或禁用长按说话模式，调用前需要经过用户确认", ParameterList({
-            Parameter("enabled", "true 表示长按说话模式，false 表示单击说话模式", kValueTypeBoolean, true)
-        }), [](const ParameterList& parameters) {
-            bool enabled = parameters["enabled"].boolean();
-            auto board = static_cast<WayoungC3Board*>(&Board::GetInstance());
-            board->SetPressToTalkEnabled(enabled);
-        });
-    }
-};
-
-} // namespace iot
-
-DECLARE_THING(PressToTalk);

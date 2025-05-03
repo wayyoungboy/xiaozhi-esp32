@@ -565,8 +565,6 @@ void Application::Start() {
     // Play the success sound to indicate the device is ready
     ResetDecoder();
     PlaySound(Lang::Sounds::P3_SUCCESS);
-    std::string wake_word="介绍下你自己";
-    GetInstance().WakeWordInvoke(wake_word);
     // Enter the main event loop
     MainEventLoop();
 }
