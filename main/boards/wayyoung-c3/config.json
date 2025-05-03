@@ -4,9 +4,9 @@
         {
             "name": "wayyoung-c3",
             "sdkconfig_append": [
-                "CONFIG_PM_ENABLE=y",
                 "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y",
-                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions_4M.csv\""
+                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions_4M.csv\"",
+                "CONFIG_OLED_SSD1306_128X32=y"
             ]
         }
     ]
