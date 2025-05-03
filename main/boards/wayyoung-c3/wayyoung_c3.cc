@@ -189,10 +189,10 @@ public:
         InitializePowerSaveTimer();
         InitializeIot();
     }
-    // virtual Led* GetLed() override {
-    //     static SingleLed led(BUILTIN_LED_GPIO);
-    //     return &led;
-    // }
+    virtual Led* GetLed() override {
+        static SingleLed led(BUILTIN_LED_GPIO);
+        return &led;
+    }
 
     // 获取音频编解码器
     virtual AudioCodec* GetAudioCodec() override 
