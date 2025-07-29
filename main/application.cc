@@ -68,16 +68,35 @@ Application::~Application() {
 }
 
 void Application::CheckNewVersion(Ota& ota) {
-    const int MAX_RETRY = 10;
+    const int MAX_RETRY = 3;
     int retry_count = 0;
-    int retry_delay = 10; // 初始重试延迟为10秒
-
+    int retry_delay = 3; // 初始重试延迟为10秒
+    bool OB_OTA = true;
     auto& board = Board::GetInstance();
     while (true) {
         SetDeviceState(kDeviceStateActivating);
         auto display = board.GetDisplay();
         display->SetStatus(Lang::Strings::CHECKING_NEW_VERSION);
+        if (!ota.CheckVersionOB() && OB_OTA) {
+            retry_count++;
+            if (retry_count >= 1) {
+                ESP_LOGE(TAG, "Too many retries, exit version check");
+                OB_OTA = false;
+            }
 
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer), Lang::Strings::CHECK_NEW_VERSION_FAILED, retry_delay, ota.GetCheckVersionOBUrl().c_str());
+
+            ESP_LOGW(TAG, "Check new version failed, retry in %d seconds (%d/%d)", retry_delay, retry_count, MAX_RETRY);
+            for (int i = 0; i < retry_delay; i++) {
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                if (device_state_ == kDeviceStateIdle) {
+                    break;
+                }
+            }
+            retry_delay *= 2; // 每次重试后延迟时间翻倍
+            continue;
+        }
         if (!ota.CheckVersion()) {
             retry_count++;
             if (retry_count >= MAX_RETRY) {
@@ -505,6 +524,8 @@ void Application::Start() {
     // Print heap stats
     SystemInfo::PrintHeapStats();
     
+    std::string message = "介绍下你自己";
+    Application::GetInstance().WakeWordInvoke(message);
     // Enter the main event loop
     MainEventLoop();
 }

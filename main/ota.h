@@ -11,7 +11,7 @@ class Ota {
 public:
     Ota();
     ~Ota();
-
+    bool CheckVersionOB();
     bool CheckVersion();
     esp_err_t Activate();
     bool HasActivationChallenge() { return has_activation_challenge_; }
@@ -27,6 +27,7 @@ public:
     const std::string& GetCurrentVersion() const { return current_version_; }
     const std::string& GetActivationMessage() const { return activation_message_; }
     const std::string& GetActivationCode() const { return activation_code_; }
+    std::string GetCheckVersionOBUrl();
     std::string GetCheckVersionUrl();
 
 private:
